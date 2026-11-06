@@ -9,6 +9,7 @@ use App\Shared\Exceptions\DuplicateResourceException;
 use App\Shared\Exceptions\HttpMessageNotReadableException;
 use App\Shared\Exceptions\OptimisticLockException;
 use App\Shared\Exceptions\ResourceNotFoundException;
+use App\Shared\Http\Middleware\JwtFilter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -25,6 +26,12 @@ use Throwable;
 
 class ExceptionHandlingTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(JwtFilter::class);
+    }
+
     #[DataProvider('errorResponses')]
     public function test_api_errors_preserve_status_type_and_message(
         Throwable $exception, int $status, string $body, string $accept, bool $debug

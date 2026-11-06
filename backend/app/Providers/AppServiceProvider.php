@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Shared\Auth\CurrentUser;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +21,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        $defaultUserResolver = Auth::userResolver();
+        Auth::resolveUsersUsing(static function ($guard = null) use ($defaultUserResolver) {
+            return request()->is('api', 'api/*')
+                ? CurrentUser::fromRequest()
+                : $defaultUserResolver($guard);
+        });
     }
 }
