@@ -65,7 +65,7 @@ class JwtFilter
         return $next($request);
     }
 
-    private function unauthenticated(Request $request): Response
+    public function unauthenticated(Request $request): Response
     {
         $error = $request->attributes->get('authError');
         $message = is_string($error) ? $error : 'Authentication required; uri='.$request->getPathInfo()
