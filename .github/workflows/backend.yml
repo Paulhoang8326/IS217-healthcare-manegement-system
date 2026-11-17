@@ -40,6 +40,7 @@ jobs:
           extensions: mbstring, intl, curl, dom, xml, gd, zip, fileinfo, pdo_mysql
           coverage: none
           tools: composer:v2
+      - run: cp .env.example .env
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/pint --test
       - run: vendor/bin/phpstan analyse --no-progress
