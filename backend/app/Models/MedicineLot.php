@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class MedicineLot extends Model
+{
+    protected $table = 'medicine_lot';
+
+    protected $primaryKey = 'medicine_lot_id';
+
+    public $timestamps = false;
+
+    protected $fillable = [
+        'medicine_id',
+        'lot_number',
+        'manufacturing_date',
+        'expiry_date',
+        'quantity',
+        'import_price',
+        'is_active',
+        'import_date',
+    ];
+
+    protected $attributes = [
+        'is_active' => 1,
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'medicine_lot_id' => 'integer',
+            'medicine_id' => 'integer',
+            'manufacturing_date' => 'date',
+            'expiry_date' => 'date',
+            'quantity' => 'integer',
+            'import_price' => 'decimal:2',
+            'is_active' => 'integer',
+            'import_date' => 'date',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<Medicine, $this>
+     */
+    public function medicine(): BelongsTo
+    {
+        return $this->belongsTo(Medicine::class, 'medicine_id', 'medicine_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (MedicineLot $lot) {
+            $lot->import_date ??= today();
+        });
+    }
+}
