@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Appointment\Console\AppointmentPaymentReservationScheduler;
 use App\Shared\Exceptions\ExceptionRenderer;
 use App\Shared\Http\Middleware\JwtFilter;
 use App\Shared\Http\Middleware\RoleMiddleware;
@@ -9,6 +10,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
+    ->withCommands([AppointmentPaymentReservationScheduler::class])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
