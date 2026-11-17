@@ -39,14 +39,20 @@ ngay; lần đầu container tự chạy `composer install`. Xem log bằng
 `docker compose --env-file backend/.env logs -f backend`. Muốn chạy server trên máy thay vì container thì
 chạy `docker compose --env-file backend/.env up -d mysql` rồi `php artisan serve --port=8000` trong `backend/`.
 
-Kiểm tra `GET http://localhost:8000/api/health` trả `{"status":"ok"}`.
-Schema nghiệp vụ và seeder sẽ được bổ sung ở task riêng.
+Schema, model, enum và seeder nghiệp vụ đã có. Sau khi MySQL sẵn sàng, chạy
+`php artisan migrate --seed` trong `backend/` (hoặc qua `docker compose --env-file backend/.env exec backend`).
+`migrate:fresh --seed` chỉ dùng khi chủ động muốn xóa và tạo lại dữ liệu.
+
+Kiểm tra server bằng `GET http://localhost:8000/up`. `GET /api/health` trả
+`{"status":"ok"}` khi có access token hợp lệ; thiếu token trả 401 như các API được bảo vệ khác.
 
 ### Database test
 
 Test chạy trên MySQL, database `healthcare_test`, dùng chung `DB_HOST`, `DB_PORT`,
 `DB_USERNAME`, `DB_PASSWORD` trong `.env`. `phpunit.xml` ép `DB_CONNECTION` và `DB_DATABASE`
 nên test không bao giờ chạm vào database `healthcare` của bản chạy thật.
+Các test integration có thể tạo lại và xóa bảng trong `healthcare_test`; không lưu dữ liệu cần giữ tại đó
+và không chạy nhiều lượt test đồng thời trên cùng database test.
 
 `docker compose up` tự tạo `healthcare_test` và cấp quyền cho `DB_USERNAME` bằng script
 `docker/mysql-init/01-create-test-database.sh` (ở gốc repo). Script này chỉ chạy khi volume `mysql_data`
@@ -68,8 +74,39 @@ php artisan test
 ```
 
 PowerShell có thể dùng `php vendor/bin/pint --test` và `php vendor/bin/phpstan analyse`.
-CI chỉ chạy khi `backend/**` thay đổi. Module Health là mẫu kiểm tra nạp route và test;
-các helper xác thực, validation và phân trang được triển khai ở task hạ tầng tiếp theo.
+CI chỉ chạy khi `backend/**` thay đổi. Chạy riêng hạ tầng bằng
+`php artisan test --testsuite=Shared`, các module bằng `php artisan test --testsuite=Modules`.
+Test concurrency Appointment chạy các tiến trình PHP riêng trên MySQL; không thay bằng SQLite.
+
+## Phần Người 1 đã triển khai
+
+- Hạ tầng: nạp module, JWT, principal, role middleware, exception renderer, BaseRequest,
+  SpringPage, SpringParameters, JavaDate, ApiResponse, OptimisticLock và SePay.
+- Scheduling: 6 endpoint `/api/doctor-schedules`, gồm import Excel qua PhpSpreadsheet.
+- Appointment: 9 endpoint `/api/appointments`, gồm đặt lịch, walk-in, chuyển trạng thái,
+  thanh toán thủ công và webhook SePay cho mã APT/DK.
+
+Các helper nằm trong `backend/app/Shared/`; code và test module nằm trong
+`backend/app/Modules/Scheduling/` và `backend/app/Modules/Appointment/`.
+
+Webhook Appointment còn hai nhánh MR/PR cần service
+`App\Modules\Payment\Services\PaymentRecordService` của Người 3. Service này chưa có;
+test điều hướng dùng stub không phải kết quả tích hợp Payment thực tế.
+Khung Newman và Java server chưa được kiểm chứng trong checkout này.
+
+### Scheduler reservation thanh toán
+
+Command `appointments:expire-payment-reservations` được đăng ký mỗi phút với
+`withoutOverlapping()`. Cấu hình cache store hợp lệ (ví dụ `CACHE_STORE=file` cho local), rồi chạy
+trong `backend/`:
+
+```sh
+php artisan schedule:list
+php artisan schedule:work
+```
+
+Muốn quét một lần, chạy `php artisan appointments:expire-payment-reservations`.
+`schedule:work` phải tiếp tục chạy để lịch tự động được thực thi trên máy local.
 
 ## Commit
 
