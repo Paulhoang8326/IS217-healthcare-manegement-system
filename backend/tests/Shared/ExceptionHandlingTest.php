@@ -15,6 +15,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -164,9 +165,13 @@ class ExceptionHandlingTest extends TestCase
     #[DataProvider('realDatabaseViolations')]
     public function test_real_database_constraint_is_rendered_through_http(?string $name, int $quantity, int $parent): void
     {
-        DB::statement('PRAGMA foreign_keys = ON');
+        $this->beforeApplicationDestroyed(function (): void {
+            DB::statement('DROP TABLE IF EXISTS exception_test');
+            DB::statement('DROP TABLE IF EXISTS exception_parent');
+        });
+        Schema::enableForeignKeyConstraints();
         DB::statement('CREATE TABLE exception_parent (id INTEGER PRIMARY KEY)');
-        DB::statement('CREATE TABLE exception_test (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, quantity INTEGER CHECK (quantity > 0), parent_id INTEGER REFERENCES exception_parent(id))');
+        DB::statement('CREATE TABLE exception_test (id INTEGER PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL, quantity INTEGER CHECK (quantity > 0), parent_id INTEGER, FOREIGN KEY (parent_id) REFERENCES exception_parent(id))');
         DB::insert('INSERT INTO exception_parent (id) VALUES (1)');
         DB::insert('INSERT INTO exception_test (id, name, quantity, parent_id) VALUES (1, ?, 1, 1)', ['duplicate']);
         Route::post('/api/database-write', function () use ($name, $quantity, $parent) {

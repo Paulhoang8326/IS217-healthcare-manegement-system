@@ -17,10 +17,14 @@ class JwtAuthenticationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->beforeApplicationDestroyed(function (): void {
+            DB::statement('DROP TABLE IF EXISTS account');
+            DB::statement('DROP TABLE IF EXISTS role');
+        });
         config(['jwt.secret' => 'local-test-secret', 'jwt.access-token-expiration-ms' => 60000,
             'jwt.verification-token-expiration-ms' => 120000]);
         DB::statement('CREATE TABLE role (role_id INTEGER PRIMARY KEY, role_name TEXT)');
-        DB::statement('CREATE TABLE account (account_id INTEGER PRIMARY KEY, email TEXT UNIQUE, role_id INTEGER, is_active INTEGER)');
+        DB::statement('CREATE TABLE account (account_id INTEGER PRIMARY KEY, email VARCHAR(255) UNIQUE, role_id INTEGER, is_active INTEGER)');
         Route::middleware('auth.jwt')->get('/api/principal', function (Request $request) {
             $user = CurrentUser::fromRequest($request);
             $this->assertSame($user, $request->user());

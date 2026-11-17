@@ -13,9 +13,13 @@ class RoleMiddlewareTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->beforeApplicationDestroyed(function (): void {
+            DB::statement('DROP TABLE IF EXISTS account');
+            DB::statement('DROP TABLE IF EXISTS role');
+        });
         config(['jwt.secret' => 'role-test-secret', 'jwt.access-token-expiration-ms' => 60000]);
         DB::statement('CREATE TABLE role (role_id INTEGER PRIMARY KEY, role_name TEXT)');
-        DB::statement('CREATE TABLE account (account_id INTEGER PRIMARY KEY, email TEXT UNIQUE, role_id INTEGER, is_active INTEGER)');
+        DB::statement('CREATE TABLE account (account_id INTEGER PRIMARY KEY, email VARCHAR(255) UNIQUE, role_id INTEGER, is_active INTEGER)');
     }
 
     private function token(?string $role): string

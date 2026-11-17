@@ -18,6 +18,11 @@ class OptimisticLockTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->beforeApplicationDestroyed(function (): void {
+            foreach (self::entities() as [$table]) {
+                DB::statement("DROP TABLE IF EXISTS $table");
+            }
+        });
 
         foreach (self::entities() as [$table, $key, $field]) {
             DB::statement("CREATE TABLE $table ($key INTEGER PRIMARY KEY, $field TEXT, created_at TEXT, updated_at TEXT, version_number BIGINT NOT NULL DEFAULT 0)");
@@ -163,7 +168,11 @@ class OptimisticLockTest extends TestCase
         DB::disableQueryLog();
         $this->assertCount(1, $queries);
         $this->assertStringStartsWith('update ', $queries[0]['query']);
-        $this->assertStringContainsString('where "med_record_id" = ? and "version_number" = ?', $queries[0]['query']);
+        $grammar = DB::connection()->getQueryGrammar();
+        $this->assertStringContainsString(
+            'where '.$grammar->wrap('med_record_id').' = ? and '.$grammar->wrap('version_number').' = ?',
+            $queries[0]['query'],
+        );
         $this->assertSame(['changed', 1, 1, 0], $queries[0]['bindings']);
     }
 
@@ -200,10 +209,10 @@ class OptimisticLockTest extends TestCase
 
     public function test_explicit_connection_participates_in_its_own_transaction(): void
     {
-        config(['database.connections.optimistic_test' => ['driver' => 'sqlite', 'database' => ':memory:']]);
+        config(['database.connections.optimistic_test' => config('database.connections.'.DB::getDefaultConnection())]);
         $connection = DB::connection('optimistic_test');
         try {
-            $connection->statement('CREATE TABLE medical_record (med_record_id INTEGER PRIMARY KEY, clinical_notes TEXT, version_number BIGINT NOT NULL DEFAULT 0)');
+            $connection->statement('CREATE TEMPORARY TABLE medical_record (med_record_id INTEGER PRIMARY KEY, clinical_notes TEXT, version_number BIGINT NOT NULL DEFAULT 0)');
             $connection->table('medical_record')->insert(['med_record_id' => 1, 'clinical_notes' => 'separate']);
 
             $connection->transaction(function (ConnectionInterface $connection): void {
