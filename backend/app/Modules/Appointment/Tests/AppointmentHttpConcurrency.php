@@ -47,7 +47,11 @@ final class AppointmentHttpConcurrency
 
     private ConsultationFee $fee;
 
-    public function __construct(private readonly string $baseUrl, private readonly int $iterations) {}
+    public function __construct(
+        private readonly string $baseUrl,
+        private readonly int $iterations,
+        private readonly ?string $secondaryBaseUrl = null,
+    ) {}
 
     public function run(): array
     {
@@ -55,9 +59,11 @@ final class AppointmentHttpConcurrency
         try {
             $this->fixtures();
             $probe = $this->schedule();
-            $response = $this->request('GET', '/api/doctor-schedules/'.$probe->getKey());
-            $this->check($response['status'] === 200 && ($this->json($response)['note'] ?? null) === 'http-concurrency:'.$this->runId,
-                'HTTP server does not read this run\'s healthcare_test fixture; no mutating HTTP request was sent');
+            foreach ($this->origins() as $origin) {
+                $response = $this->request('GET', '/api/doctor-schedules/'.$probe->getKey(), null, $origin);
+                $this->check($response['status'] === 200 && ($this->json($response)['note'] ?? null) === 'http-concurrency:'.$this->runId,
+                    'HTTP server does not read this run\'s healthcare_test fixture; no mutating HTTP request was sent');
+            }
             $results = [];
             for ($iteration = 1; $iteration <= $this->iterations; $iteration++) {
                 $this->lastSlot();
@@ -76,12 +82,14 @@ final class AppointmentHttpConcurrency
 
     private function guardEnvironment(): void
     {
-        $url = parse_url($this->baseUrl);
-        if ($url === false || ! in_array($url['scheme'] ?? '', ['http', 'https'], true)
-            || ! in_array($url['host'] ?? '', ['127.0.0.1', 'localhost', '[::1]'], true)
-            || isset($url['user']) || isset($url['pass']) || isset($url['query']) || isset($url['fragment'])
-            || ! in_array($url['path'] ?? '', ['', '/'], true)) {
-            throw new RuntimeException('Use a loopback HTTP server origin without credentials, path, query or fragment');
+        foreach ($this->origins() as $origin) {
+            $url = parse_url($origin);
+            if ($url === false || ! in_array($url['scheme'] ?? '', ['http', 'https'], true)
+                || ! in_array($url['host'] ?? '', ['127.0.0.1', 'localhost', '[::1]'], true)
+                || isset($url['user']) || isset($url['pass']) || isset($url['query']) || isset($url['fragment'])
+                || ! in_array($url['path'] ?? '', ['', '/'], true)) {
+                throw new RuntimeException('Use a loopback HTTP server origin without credentials, path, query or fragment');
+            }
         }
         if ($this->iterations < 1 || $this->iterations > 20) {
             throw new RuntimeException('Iterations must be between 1 and 20');
@@ -236,8 +244,9 @@ final class AppointmentHttpConcurrency
         DB::beginTransaction();
         try {
             $lock();
-            foreach ($specs as $spec) {
-                $handle = $this->handle($spec);
+            $origins = $this->origins();
+            foreach ($specs as $index => $spec) {
+                $handle = $this->handle($spec, $origins[$index % count($origins)]);
                 $handles[] = $handle;
                 curl_multi_add_handle($multi, $handle);
             }
@@ -257,7 +266,9 @@ final class AppointmentHttpConcurrency
                     break;
                 }
                 if (microtime(true) >= $deadline || $active === 0) {
-                    throw new RuntimeException('Requests did not reach concurrent SQL locks; use at least two HTTP workers and the same MySQL user as the CLI');
+                    $statuses = array_map(fn ($handle) => curl_getinfo($handle, CURLINFO_HTTP_CODE), $handles);
+                    throw new RuntimeException('Requests did not reach concurrent SQL locks on '.$table.' ('.$waiting.' waiting; HTTP '.implode(',', $statuses)
+                        .'); use at least two HTTP workers and the same MySQL user as the CLI');
                 }
                 curl_multi_select($multi, 0.01);
             } while (true);
@@ -310,9 +321,14 @@ final class AppointmentHttpConcurrency
         return ['method' => 'POST', 'path' => $path, 'body' => $body, 'webhook' => $webhook];
     }
 
-    private function request(string $method, string $path, ?array $body = null): array
+    private function origins(): array
     {
-        $handle = $this->handle(['method' => $method, 'path' => $path, 'body' => $body, 'webhook' => false]);
+        return $this->secondaryBaseUrl === null ? [$this->baseUrl] : [$this->baseUrl, $this->secondaryBaseUrl];
+    }
+
+    private function request(string $method, string $path, ?array $body = null, ?string $origin = null): array
+    {
+        $handle = $this->handle(['method' => $method, 'path' => $path, 'body' => $body, 'webhook' => false], $origin);
         try {
             $content = curl_exec($handle);
 
@@ -322,9 +338,9 @@ final class AppointmentHttpConcurrency
         }
     }
 
-    private function handle(array $spec): CurlHandle
+    private function handle(array $spec, ?string $origin = null): CurlHandle
     {
-        $handle = curl_init(rtrim($this->baseUrl, '/').$spec['path']);
+        $handle = curl_init(rtrim($origin ?? $this->baseUrl, '/').$spec['path']);
         if ($handle === false) {
             throw new RuntimeException('Could not initialize HTTP client');
         }

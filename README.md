@@ -87,31 +87,37 @@ Runner không sửa code app, không tạo lại schema và chỉ xóa fixture t
 
 Điều kiện: CLI và HTTP server cùng dùng MySQL `healthcare_test`, cùng user MySQL, JWT secret và
 SePay secret; database không có appointment trước khi chạy. Không chạy chung với bộ test khác.
-Server cần ít nhất hai worker, ví dụ Nginx/PHP-FPM. Runner kiểm tra note ngẫu nhiên của fixture qua
-API đọc trước khi gửi bất kỳ HTTP request ghi dữ liệu nào; sai server hoặc thiếu worker sẽ fail.
+Server cần ít nhất hai worker, ví dụ Nginx/PHP-FPM, hoặc hai server độc lập qua tùy chọn
+`--secondary-base-url`. Runner kiểm tra note ngẫu nhiên của fixture qua API đọc trên từng origin
+trước khi gửi bất kỳ HTTP request ghi dữ liệu nào; sai server hoặc thiếu actor đồng thời sẽ fail.
 URL chỉ nhận origin loopback, số lượt từ 1 đến 20, mặc định 3. Đây là kiểm tra PHP/MySQL,
 chưa phải kết quả so sánh với Java server.
 
-Trên Windows có thể dùng PHP server nhiều worker trong Docker Linux. Từ gốc repo, với `.env`
-đã cấu hình theo phần Chạy backend và Database test, mở terminal thứ nhất:
+Trên Windows có thể chạy hai PHP server trong cùng container Linux. Từ gốc repo, với dependency
+và `.env` đã cấu hình theo phần Chạy backend và Database test:
 
 ```sh
 docker compose --env-file backend/.env up -d mysql
-docker compose --env-file backend/.env run --rm --no-deps --name healthcare-http-check -p 127.0.0.1:18080:8000 -e APP_ENV=testing -e DB_DATABASE=healthcare_test -e CACHE_STORE=file -e PHP_CLI_SERVER_WORKERS=4 backend
+docker compose --env-file backend/.env run -d --rm --no-deps --name healthcare-http-check -p 127.0.0.1:18080:8000 -p 127.0.0.1:18081:8001 -e APP_ENV=testing -e DB_CONNECTION=mysql -e DB_DATABASE=healthcare_test -e DB_URL= -e CACHE_STORE=file -e PHP_CLI_SERVER_WORKERS=1 backend php artisan serve --no-reload --host=0.0.0.0 --port=8000
+docker exec -d healthcare-http-check php artisan serve --no-reload --host=0.0.0.0 --port=8001
 ```
 
-Ở terminal thứ hai, từ gốc repo, sau khi server sẵn sàng:
+Sau khi hai server sẵn sàng:
 
 ```sh
+docker exec healthcare-http-check php artisan config:clear
+docker exec healthcare-http-check php artisan route:clear
 docker exec healthcare-http-check php artisan migrate --force
-docker exec healthcare-http-check php app/Modules/Appointment/Tests/http-concurrency.php --base-url=http://127.0.0.1:8000 --iterations=3
+docker exec healthcare-http-check php app/Modules/Appointment/Tests/http-concurrency.php --base-url=http://127.0.0.1:8000 --secondary-base-url=http://127.0.0.1:8001 --iterations=3
+docker stop healthcare-http-check
 ```
 
-Server Compose dùng `artisan serve --no-reload`, nên giữ được `PHP_CLI_SERVER_WORKERS=4` trên Linux.
+Hai cổng PHP CLI độc lập giúp mỗi actor có tiến trình xử lý riêng.
 Nếu đã dùng `config:cache` cho workspace, cần bỏ cache cũ trước khi tạo server test để các biến
-môi trường test có hiệu lực. Không dùng PHP server một worker hoặc bật nhiều worker trực tiếp
-trên Windows. Kết quả JSON ra stdout chứa số lượt, số tình huống pass và số lock barrier quan sát
-được; lỗi trả exit code 1. Dừng terminal server bằng Ctrl+C khi xong.
+môi trường test có hiệu lực. Kết quả JSON ra stdout chứa số lượt, số tình huống pass và số lock barrier
+quan sát được; lỗi trả exit code 1.
+Workflow Backend chạy runner 3 lượt trên hai server PHP độc lập sau bộ PHPUnit, với database CI
+`healthcare_test` được tạo lại riêng cho bước HTTP.
 
 ## Phần Người 1 đã triển khai
 
