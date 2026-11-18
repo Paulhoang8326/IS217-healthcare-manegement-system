@@ -124,8 +124,10 @@ Workflow Backend chạy runner 3 lượt trên hai server PHP độc lập sau b
 - Hạ tầng: nạp module, JWT, principal, role middleware, exception renderer, BaseRequest,
   SpringPage, SpringParameters, JavaDate, ApiResponse, OptimisticLock và SePay.
 - Scheduling: 6 endpoint `/api/doctor-schedules`, gồm import Excel qua PhpSpreadsheet.
+  Xem [hành vi, quyền và các giới hạn import](backend/app/Modules/Scheduling/README.md).
 - Appointment: 9 endpoint `/api/appointments`, gồm đặt lịch, walk-in, chuyển trạng thái,
   thanh toán thủ công và webhook SePay cho mã APT/DK.
+  Xem [request/response, trạng thái, transaction và dependency MR/PR](backend/app/Modules/Appointment/README.md).
 
 Các helper nằm trong `backend/app/Shared/`; code và test module nằm trong
 `backend/app/Modules/Scheduling/` và `backend/app/Modules/Appointment/`.
