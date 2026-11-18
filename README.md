@@ -78,6 +78,41 @@ CI chỉ chạy khi `backend/**` thay đổi. Chạy riêng hạ tầng bằng
 `php artisan test --testsuite=Shared`, các module bằng `php artisan test --testsuite=Modules`.
 Test concurrency Appointment chạy các tiến trình PHP riêng trên MySQL; không thay bằng SQLite.
 
+### Tranh chấp Appointment qua HTTP
+
+Runner `backend/app/Modules/Appointment/Tests/http-concurrency.php` gửi HTTP song song và quan sát
+`SHOW FULL PROCESSLIST` trước khi nhả khóa MySQL. Mỗi lượt kiểm tra: tranh suất cuối, cùng bệnh nhân
+đặt hai lịch, webhook trùng transaction ID và webhook đã hết hạn cạnh tranh với scheduler thật.
+Runner không sửa code app, không tạo lại schema và chỉ xóa fixture thuộc chính lượt chạy.
+
+Điều kiện: CLI và HTTP server cùng dùng MySQL `healthcare_test`, cùng user MySQL, JWT secret và
+SePay secret; database không có appointment trước khi chạy. Không chạy chung với bộ test khác.
+Server cần ít nhất hai worker, ví dụ Nginx/PHP-FPM. Runner kiểm tra note ngẫu nhiên của fixture qua
+API đọc trước khi gửi bất kỳ HTTP request ghi dữ liệu nào; sai server hoặc thiếu worker sẽ fail.
+URL chỉ nhận origin loopback, số lượt từ 1 đến 20, mặc định 3. Đây là kiểm tra PHP/MySQL,
+chưa phải kết quả so sánh với Java server.
+
+Trên Windows có thể dùng PHP server nhiều worker trong Docker Linux. Từ gốc repo, với `.env`
+đã cấu hình theo phần Chạy backend và Database test, mở terminal thứ nhất:
+
+```sh
+docker compose --env-file backend/.env up -d mysql
+docker compose --env-file backend/.env run --rm --no-deps --name healthcare-http-check -p 127.0.0.1:18080:8000 -e APP_ENV=testing -e DB_DATABASE=healthcare_test -e CACHE_STORE=file -e PHP_CLI_SERVER_WORKERS=4 backend
+```
+
+Ở terminal thứ hai, từ gốc repo, sau khi server sẵn sàng:
+
+```sh
+docker exec healthcare-http-check php artisan migrate --force
+docker exec healthcare-http-check php app/Modules/Appointment/Tests/http-concurrency.php --base-url=http://127.0.0.1:8000 --iterations=3
+```
+
+Server Compose dùng `artisan serve --no-reload`, nên giữ được `PHP_CLI_SERVER_WORKERS=4` trên Linux.
+Nếu đã dùng `config:cache` cho workspace, cần bỏ cache cũ trước khi tạo server test để các biến
+môi trường test có hiệu lực. Không dùng PHP server một worker hoặc bật nhiều worker trực tiếp
+trên Windows. Kết quả JSON ra stdout chứa số lượt, số tình huống pass và số lock barrier quan sát
+được; lỗi trả exit code 1. Dừng terminal server bằng Ctrl+C khi xong.
+
 ## Phần Người 1 đã triển khai
 
 - Hạ tầng: nạp module, JWT, principal, role middleware, exception renderer, BaseRequest,
