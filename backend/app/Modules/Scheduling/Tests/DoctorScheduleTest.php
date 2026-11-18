@@ -159,6 +159,14 @@ class DoctorScheduleTest extends PersonOneModuleTestCase
             ->assertHeader('Content-Type', 'text/plain;charset=UTF-8');
     }
 
+    public function test_import_keeps_the_four_shift_error_even_though_the_enum_has_two_values(): void
+    {
+        $file = $this->spreadsheet([['Doctor', 'Room', 'Date', 'Shift'], ['Doctor One', 'TEST-ROOM', '2026-11-18', 'EVENING']]);
+        $this->post('/api/doctor-schedules/import', ['file' => $file], $this->auth())
+            ->assertStatus(400)->assertContent('Ca trực không hợp lệ (MORNING, AFTERNOON, EVENING, NIGHT): EVENING ở dòng 2');
+        $this->assertSame(0, DoctorSchedule::count());
+    }
+
     public function test_excel_date_uses_java_smart_month_end_resolution(): void
     {
         $repository = $this->createMock(DoctorScheduleRepository::class);

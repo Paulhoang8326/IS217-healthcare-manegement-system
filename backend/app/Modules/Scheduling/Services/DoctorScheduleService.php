@@ -123,6 +123,7 @@ class DoctorScheduleService
                     $this->validateScheduleDate($date);
                     $shift = ShiftType::tryFrom(trim(mb_strtoupper($shiftText), "\x00..\x20"));
                     if ($shift === null) {
+                        // QUIRK-NEW: Java lists EVENING/NIGHT although ShiftType defines only MORNING/AFTERNOON.
                         throw new BusinessException('Ca trực không hợp lệ (MORNING, AFTERNOON, EVENING, NIGHT): '.$shiftText.' ở dòng '.$row);
                     }
                     $this->validateDuplicateDoctorShift($doctor->doctor_id, $date, $shift->value, null);
