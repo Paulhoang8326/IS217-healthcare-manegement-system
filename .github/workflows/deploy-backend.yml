@@ -1,0 +1,131 @@
+name: Deploy backend
+
+on:
+  workflow_run:
+    workflows: [Backend]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      RELEASE_ID: ${{ github.event.workflow_run.head_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+    steps:
+      - name: Check out verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Check backend still matches main
+        id: current
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          verified_tree=$(git rev-parse "$DEPLOY_SHA:backend")
+          main_tree=$(gh api "repos/$GITHUB_REPOSITORY/git/trees/main" --jq '.tree[] | select(.path == "backend") | .sha')
+          if [[ "$verified_tree" == "$main_tree" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Skipping an outdated backend revision.'
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare release and SSH
+        if: steps.current.outputs.deploy == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DEPLOY_PATH; do
+            if [[ -z "${!name}" ]]; then
+              printf 'Missing deployment setting: %s\n' "$name" >&2
+              exit 1
+            fi
+          done
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]{1,5}$ ]]
+          (( 10#$DEPLOY_PORT >= 1 && 10#$DEPLOY_PORT <= 65535 ))
+          [[ "$DEPLOY_PATH" =~ ^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$ ]]
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_ID" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]]
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/deploy_known_hosts"
+          ssh-keygen -y -f "$RUNNER_TEMP/deploy_key" > /dev/null
+          git archive --format=tar.gz --output="$RUNNER_TEMP/backend.tar.gz" "$DEPLOY_SHA:backend"
+
+      - name: Upload and deploy release
+        if: steps.current.outputs.deploy == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          common=(-i "$RUNNER_TEMP/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$RUNNER_TEMP/deploy_known_hosts" -o ConnectTimeout=15)
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "${common[@]}" -p "$DEPLOY_PORT" "$target" bash -se -- "$DEPLOY_PATH" <<'PREPARE'
+          set -euo pipefail
+          root="$1"
+          test -s "$root/shared/.env"
+          test -d "$root/shared/storage"
+          umask 0027
+          mkdir -p "$root/incoming" "$root/releases"
+          PREPARE
+          scp "${common[@]}" -P "$DEPLOY_PORT" "$RUNNER_TEMP/backend.tar.gz" "$target:$DEPLOY_PATH/incoming/$RELEASE_ID.tar.gz"
+          ssh "${common[@]}" -p "$DEPLOY_PORT" "$target" bash -se -- "$DEPLOY_PATH" "$RELEASE_ID" <<'DEPLOY'
+          set -euo pipefail
+          umask 0027
+          root="$1"
+          release_id="$2"
+          release="$root/releases/$release_id"
+          archive="$root/incoming/$release_id.tar.gz"
+          test -s "$root/shared/.env"
+          test -d "$root/shared/storage"
+          mkdir "$release"
+          tar -xzf "$archive" -C "$release" --exclude=storage
+          ln -sT "$root/shared/.env" "$release/.env"
+          ln -sT "$root/shared/storage" "$release/storage"
+          chgrp www-data "$release/bootstrap/cache"
+          chmod 2770 "$release/bootstrap/cache"
+          cd "$release"
+          php8.4 /usr/local/bin/composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
+          php8.4 /usr/local/bin/composer check-platform-reqs --no-dev
+          chgrp -hR www-data "$release"
+          php8.4 artisan down --retry=60
+          php8.4 artisan migrate --force --no-interaction
+          php8.4 artisan config:cache
+          php8.4 artisan route:cache
+          ln -sT "$release" "$root/current.next.$release_id"
+          mv -Tf -- "$root/current.next.$release_id" "$root/current"
+          sudo -n /usr/bin/systemctl reload php8.4-fpm
+          php8.4 artisan up
+          rm -- "$archive"
+          DEPLOY
+
+      - name: Remove temporary SSH credentials
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/deploy_known_hosts"

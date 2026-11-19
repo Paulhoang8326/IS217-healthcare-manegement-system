@@ -52,3 +52,65 @@ jobs:
           DB_DATABASE: healthcare_test
           DB_USERNAME: healthcare
           DB_PASSWORD: ci_only
+      - name: Check HTTP concurrency
+        env:
+          APP_NAME: Healthcare
+          APP_ENV: testing
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          APP_DEBUG: 'false'
+          APP_URL: http://127.0.0.1:8000
+          APP_LOCALE: en
+          APP_FALLBACK_LOCALE: en
+          APP_MAINTENANCE_DRIVER: file
+          LOG_CHANNEL: single
+          LOG_LEVEL: debug
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: '3306'
+          DB_DATABASE: healthcare_test
+          DB_USERNAME: healthcare
+          DB_PASSWORD: ci_only
+          DB_URL: ''
+          CACHE_STORE: file
+          SESSION_DRIVER: file
+          QUEUE_CONNECTION: sync
+          FILESYSTEM_DISK: local
+          BROADCAST_CONNECTION: 'null'
+          JWT_SECRET: ci_http_only
+          JWT_ACCESS_TOKEN_EXPIRATION_MS: '600000'
+          SEPAY_WEBHOOK_SECRET: ci_http_only
+          SEPAY_ACCOUNT_NUMBER: '123456'
+          PHP_CLI_SERVER_WORKERS: '1'
+        run: |
+          set -euo pipefail
+          test "$DB_DATABASE" = healthcare_test
+          php artisan config:clear
+          php artisan route:clear
+          php artisan migrate:fresh --force --no-interaction
+          server_pids=()
+          cleanup() {
+            for pid in "${server_pids[@]}"; do
+              kill -- -"$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+            done
+          }
+          trap cleanup EXIT
+          for port in 8000 8001; do
+            setsid php artisan serve --no-reload --host=127.0.0.1 --port="$port" > "$RUNNER_TEMP/hms-http-$port.log" 2>&1 &
+            server_pids+=("$!")
+          done
+          for port in 8000 8001; do
+            ready=false
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --output /dev/null "http://127.0.0.1:$port/up"; then
+                ready=true
+                break
+              fi
+              sleep 0.2
+            done
+            if [[ "$ready" != true ]]; then
+              cat "$RUNNER_TEMP/hms-http-$port.log"
+              exit 1
+            fi
+          done
+          php app/Modules/Appointment/Tests/http-concurrency.php --base-url=http://127.0.0.1:8000 --secondary-base-url=http://127.0.0.1:8001 --iterations=3
