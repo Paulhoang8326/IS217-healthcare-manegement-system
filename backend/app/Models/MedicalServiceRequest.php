@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Enums\MedicalServiceRequestStatus;
 use App\Enums\PaymentStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MedicalServiceRequest extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'medical_service_request';
 
     protected $primaryKey = 'med_ser_req_id';
@@ -33,6 +36,8 @@ class MedicalServiceRequest extends Model
 
     protected $attributes = [
         'currency' => 'VND',
+        // Hibernate inserts NULL for an unset field, so the column DEFAULT must not apply.
+        'total_price' => null,
     ];
 
     protected function casts(): array

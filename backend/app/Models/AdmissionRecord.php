@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AdmissionRecord extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'admission_record';
 
     protected $primaryKey = 'admission_record_id';

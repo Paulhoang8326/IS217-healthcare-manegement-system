@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasCompositePrimaryKey;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AccountPermission extends Model
 {
     use HasCompositePrimaryKey;
+    use StoresEmptyStringAsNull;
 
     protected $table = 'account_permission';
 

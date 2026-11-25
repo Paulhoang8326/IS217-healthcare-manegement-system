@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'role';
 
     protected $primaryKey = 'role_id';

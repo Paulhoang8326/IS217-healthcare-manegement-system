@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 
 class Permission extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'permission';
 
     protected $primaryKey = 'permission_id';

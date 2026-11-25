@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 
 class Branch extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'branch';
 
     protected $primaryKey = 'branch_id';

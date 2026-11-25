@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Enums\BedStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Bed extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'bed';
 
     protected $primaryKey = 'bed_id';

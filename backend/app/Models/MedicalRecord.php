@@ -4,11 +4,14 @@ namespace App\Models;
 
 use App\Enums\MedicalRecordConclusionType;
 use App\Enums\MedicalRecordStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicalRecord extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'medical_record';
 
     protected $primaryKey = 'med_record_id';

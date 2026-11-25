@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Enums\AppointmentStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Appointment extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'appointment';
 
     protected $primaryKey = 'appointment_id';

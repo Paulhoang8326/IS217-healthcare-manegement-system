@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Enums\AdmissionStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AdmissionRequest extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'admission_request';
 
     protected $primaryKey = 'admission_id';
@@ -26,6 +29,8 @@ class AdmissionRequest extends Model
 
     protected $attributes = [
         'status' => 'PENDING',
+        // Hibernate inserts NULL for an unset field, so the column DEFAULT must not apply.
+        'total_price' => null,
     ];
 
     protected function casts(): array

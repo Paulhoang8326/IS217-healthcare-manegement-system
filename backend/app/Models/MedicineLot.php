@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicineLot extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'medicine_lot';
 
     protected $primaryKey = 'medicine_lot_id';
@@ -26,6 +29,8 @@ class MedicineLot extends Model
 
     protected $attributes = [
         'is_active' => 1,
+        // Hibernate inserts NULL for an unset field, so the column DEFAULT must not apply.
+        'quantity' => null,
     ];
 
     protected function casts(): array

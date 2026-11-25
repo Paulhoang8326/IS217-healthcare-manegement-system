@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Enums\LabTestRequestStatus;
 use App\Enums\PaymentStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LabTestRequest extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'lab_test_request';
 
     protected $primaryKey = 'lab_test_request_id';
@@ -26,6 +29,11 @@ class LabTestRequest extends Model
         'created_at',
         'updated_at',
         'paid_at',
+    ];
+
+    protected $attributes = [
+        // Hibernate inserts NULL for an unset field, so the column DEFAULT must not apply.
+        'total_price' => null,
     ];
 
     protected function casts(): array

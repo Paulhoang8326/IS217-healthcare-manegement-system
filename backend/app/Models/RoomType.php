@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 
 class RoomType extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'room_type';
 
     protected $primaryKey = 'room_type_id';
