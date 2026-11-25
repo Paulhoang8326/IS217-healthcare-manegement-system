@@ -26,6 +26,8 @@ class MedicineLot extends Model
 
     protected $attributes = [
         'is_active' => 1,
+        // Hibernate inserts NULL for an unset field, so the column DEFAULT must not apply.
+        'quantity' => null,
     ];
 
     protected function casts(): array

@@ -28,6 +28,11 @@ class LabTestRequest extends Model
         'paid_at',
     ];
 
+    protected $attributes = [
+        // Hibernate inserts NULL for an unset field, so the column DEFAULT must not apply.
+        'total_price' => null,
+    ];
+
     protected function casts(): array
     {
         return [
