@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 
 class Specialty extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'specialty';
 
     protected $primaryKey = 'specialty_id';

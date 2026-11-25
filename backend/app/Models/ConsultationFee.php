@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ConsultationFee extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'consultation_fee';
 
     protected $primaryKey = 'fee_id';

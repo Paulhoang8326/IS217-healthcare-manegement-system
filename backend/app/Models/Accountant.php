@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Accountant extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'accountant';
 
     protected $primaryKey = 'accountant_id';

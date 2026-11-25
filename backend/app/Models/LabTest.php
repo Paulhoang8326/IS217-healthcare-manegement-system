@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 
 class LabTest extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'lab_test';
 
     protected $primaryKey = 'lab_test_id';

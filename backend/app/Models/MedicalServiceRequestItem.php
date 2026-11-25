@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasCompositePrimaryKey;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicalServiceRequestItem extends Model
 {
     use HasCompositePrimaryKey;
+    use StoresEmptyStringAsNull;
 
     protected $table = 'medical_service_request_item';
 

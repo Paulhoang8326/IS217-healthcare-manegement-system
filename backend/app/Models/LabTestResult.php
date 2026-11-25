@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LabTestResult extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'lab_test_result';
 
     protected $primaryKey = 'lab_test_result_id';

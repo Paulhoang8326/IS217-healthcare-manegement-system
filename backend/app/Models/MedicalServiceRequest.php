@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Enums\MedicalServiceRequestStatus;
 use App\Enums\PaymentStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MedicalServiceRequest extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'medical_service_request';
 
     protected $primaryKey = 'med_ser_req_id';

@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Enums\PaymentStatus;
+use App\Models\Concerns\StoresEmptyStringAsNull;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PaymentRecord extends Model
 {
+    use StoresEmptyStringAsNull;
+
     protected $table = 'payment_record';
 
     protected $primaryKey = 'payment_record_id';
